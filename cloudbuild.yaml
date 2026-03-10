@@ -1,0 +1,81 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
+      - '.'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--execution-environment'
+      - 'gen2'
+      - '--no-cpu-throttling'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '1'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--port'
+      - '8080'
+      - '--service-account'
+      - '${_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--set-secrets'
+      - 'TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest'
+      - '--update-env-vars'
+      - 'DATA_DIR=/mnt/gcs/data'
+      - '--add-volume'
+      - 'name=gcs-fuse,type=cloud-storage,bucket=stocks-bot-data'
+      - '--add-volume-mount'
+      - 'volume=gcs-fuse,mount-path=/mnt/gcs'
+      - '--quiet'
+
+  # Get service URL and update WEBHOOK_URL env var
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
+          --region=${_REGION} --format='value(status.url)')
+        gcloud run services update ${_SERVICE_NAME} \
+          --region=${_REGION} \
+          --update-env-vars="WEBHOOK_URL=$${SERVICE_URL}" \
+          --quiet
+
+substitutions:
+  _REGION: us-central1
+  _REPO_NAME: stocks-bot
+  _SERVICE_NAME: stocks-bot
+  _SA_NAME: stocks-bot-sa
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

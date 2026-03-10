@@ -1,0 +1,49 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: stocks-bot
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      serviceAccountName: stocks-bot-sa@dharma-bot.iam.gserviceaccount.com
+      containerConcurrency: 80
+      containers:
+        - image: us-central1-docker.pkg.dev/dharma-bot/stocks-bot/stocks-bot:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: "1"
+          env:
+            - name: TELEGRAM_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: TELEGRAM_BOT_TOKEN
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: ANTHROPIC_API_KEY
+            - name: DATA_DIR
+              value: /mnt/gcs/data
+            - name: WEBHOOK_URL
+              value: PLACEHOLDER
+          volumeMounts:
+            - name: gcs-fuse
+              mountPath: /mnt/gcs
+      volumes:
+        - name: gcs-fuse
+          csi:
+            driver: gcsfuse.run.googleapis.com
+            volumeAttributes:
+              bucketName: stocks-bot-data
