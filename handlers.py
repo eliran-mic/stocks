@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes
 from db import add_stock, remove_stock, get_portfolio, set_alert
 from stock_data import validate_ticker, get_batch_prices
 from analysis import analyze_stock, Action, Strength
-from ai_advisor import get_ai_advice
+from ai_advisor import get_ai_advice, get_portfolio_strategy, _build_portfolio_context
 from formatting import format_portfolio, format_analysis, format_alerts
 
 logger = logging.getLogger(__name__)
@@ -17,9 +17,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     chat_id = update.effective_chat.id
     set_alert(user_id, chat_id, is_active=True)
     await update.message.reply_text(
-        "*Welcome to Stock Portfolio Bot!*\n\n"
-        "I'll help you track your portfolio and provide buy/sell signals.\n\n"
-        "Use /help to see available commands.\n"
+        "*Welcome to your Family Office Bot*\n\n"
+        "I manage your portfolio to grow wealth over time.\n"
+        "I'll track positions, run technical analysis, and give you\n"
+        "specific trade instructions with price targets.\n\n"
+        "/strategy - Full portfolio review & action plan\n"
+        "/help - All commands\n\n"
         "You've been registered for periodic alerts.",
         parse_mode="Markdown",
     )
@@ -35,6 +38,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/batch AAPL 10 150, GOOGL 5 140 - Add multiple\n"
         "/portfolio - View holdings with live P&L\n"
         "/analyze TICKER - Technical + AI analysis\n"
+        "/strategy - Full portfolio strategy review\n"
         "/alerts - Check all holdings for signals",
         parse_mode="Markdown",
     )
@@ -180,8 +184,15 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return
 
+    # Build full portfolio context so AI sees the bigger picture
     await msg.edit_text(f"Running AI analysis for {ticker}...")
-    ai_advice = get_ai_advice(result, purchase_price, quantity)
+    portfolio_context = None
+    if holdings:
+        tickers = [h["ticker"] for h in holdings]
+        prices = get_batch_prices(tickers)
+        portfolio_context = _build_portfolio_context(holdings, prices)
+
+    ai_advice = get_ai_advice(result, purchase_price, quantity, portfolio_context)
 
     text = format_analysis(result, ai_advice)
     await msg.edit_text(text, parse_mode="Markdown")
@@ -212,4 +223,39 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 ticker_results.append((h["ticker"], result))
 
     text = format_alerts(ticker_results)
+    await msg.edit_text(text, parse_mode="Markdown")
+
+
+async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    holdings = get_portfolio(user_id)
+
+    if not holdings:
+        await update.message.reply_text(
+            "Your portfolio is empty. Use /add to add stocks."
+        )
+        return
+
+    msg = await update.message.reply_text(
+        "Analyzing full portfolio — running strategy review..."
+    )
+
+    # Fetch prices and run technical analysis on all holdings
+    tickers = [h["ticker"] for h in holdings]
+    prices = get_batch_prices(tickers)
+
+    analysis_results = []
+    for h in holdings:
+        result = analyze_stock(h["ticker"], h["purchase_price"])
+        if result is not None:
+            analysis_results.append((h["ticker"], result))
+
+    await msg.edit_text("Running AI strategy review...")
+    strategy = get_portfolio_strategy(holdings, prices, analysis_results)
+
+    if strategy:
+        text = f"*Family Office Strategy Review*\n\n{strategy}"
+    else:
+        text = "Could not generate strategy. Check API key configuration."
+
     await msg.edit_text(text, parse_mode="Markdown")

@@ -7,28 +7,84 @@ from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a practical stock trading advisor. Given technical data and the user's position, provide *specific actionable advice*.
+STOCK_PROMPT = """You are a family office CIO managing a private portfolio. You think long-term wealth growth, not day trading. Given technical data and the client's position, provide *specific actionable advice*.
 
 Your response MUST include:
 
 1. *Action*: BUY / SELL / HOLD — be decisive
 2. *How to execute*:
-   - If SELL: specify order type (market sell, limit sell at $X, or trailing stop at X%)
-   - If BUY: specify entry price or "at market", and how many shares if cash available
-   - If HOLD: specify at what price you'd change to SELL or BUY
-3. *Stop-loss*: exact price to set a stop-loss order
+   - If SELL: order type (market, limit at $X, or trailing stop at X%), partial or full exit
+   - If BUY: entry price or "at market", position sizing
+   - If HOLD: what price triggers a SELL or additional BUY
+3. *Stop-loss*: exact price
 4. *Target*: price target to take profits
-5. *With freed cash* (if SELL): suggest what to do — e.g. specific sector rotation, wait for dip, move to index ETF (SPY/QQQ), or hold cash. Be specific.
+5. *Capital reallocation* (if SELL): where to move the cash — name specific tickers/ETFs (e.g. rotate to defensive sector via XLU, add to index via VOO, park in short-term treasuries via SHV). Consider the rest of the portfolio for diversification.
+
+Consider the FULL PORTFOLIO CONTEXT when advising. Avoid over-concentration.
 
 Format for Telegram (use *bold* for key numbers). Keep under 250 words.
-Use $ for prices. Be direct, no fluff.
+Use $ for prices. Be direct — this is a CIO briefing, not a blog post.
 End with: _Not financial advice. Do your own research._"""
+
+STRATEGY_PROMPT = """You are a family office CIO. The client wants to grow their wealth steadily over time. Review the ENTIRE portfolio and provide a strategic briefing.
+
+Your response MUST include:
+
+1. *Portfolio Health*: overall assessment (1-2 sentences)
+2. *Concentration Risk*: flag any position >25% of portfolio, or sector over-exposure
+3. *Weak Positions*: which holdings to trim or exit, with specific prices
+4. *Strong Positions*: which to hold or add to, with target add prices
+5. *Missing Exposure*: sectors/themes the portfolio lacks (e.g. international, bonds, REITs, commodities) — suggest 1-2 specific ETFs/tickers to add
+6. *Action Plan*: numbered list of 3-5 specific trades to execute this week, with order types and prices
+7. *Cash Strategy*: if any sells, where to park or deploy the capital
+
+Think like a wealth manager: diversification, risk-adjusted returns, downside protection.
+
+Format for Telegram (use *bold* for key numbers and tickers). Keep under 400 words.
+Use $ for prices. Be direct and specific — no vague platitudes.
+End with: _Not financial advice. Do your own research._"""
+
+
+def _build_portfolio_context(
+    holdings: list[dict],
+    prices: dict[str, float | None],
+) -> str:
+    lines = ["Full Portfolio:"]
+    total_value = 0.0
+    positions = []
+
+    for h in holdings:
+        ticker = h["ticker"]
+        qty = h["quantity"]
+        buy_price = h["purchase_price"]
+        current = prices.get(ticker)
+        if current is not None:
+            value = qty * current
+            pnl_pct = ((current - buy_price) / buy_price) * 100
+            total_value += value
+            positions.append((ticker, qty, buy_price, current, value, pnl_pct))
+        else:
+            cost = qty * buy_price
+            total_value += cost
+            positions.append((ticker, qty, buy_price, None, cost, 0))
+
+    for ticker, qty, buy, cur, val, pnl in positions:
+        weight = (val / total_value * 100) if total_value > 0 else 0
+        cur_str = f"${cur:.2f}" if cur else "N/A"
+        lines.append(
+            f"  {ticker}: {qty} shares, bought ${buy:.2f}, now {cur_str}, "
+            f"P&L {pnl:+.1f}%, weight {weight:.1f}%"
+        )
+
+    lines.append(f"Total portfolio value: ${total_value:,.2f}")
+    return "\n".join(lines)
 
 
 def get_ai_advice(
     result: AnalysisResult,
     purchase_price: float | None = None,
     quantity: float | None = None,
+    portfolio_context: str | None = None,
 ) -> str | None:
     if not ANTHROPIC_API_KEY:
         return None
@@ -73,15 +129,67 @@ def get_ai_advice(
 
     context_parts.append(f"\nOverall Technical Signal: {result.overall_action.value}")
 
+    if portfolio_context:
+        context_parts.append(f"\n{portfolio_context}")
+
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=512,
-            system=SYSTEM_PROMPT,
+            max_tokens=700,
+            system=STOCK_PROMPT,
             messages=[{"role": "user", "content": "\n".join(context_parts)}],
         )
         return message.content[0].text
     except Exception as e:
         logger.warning(f"AI advisor error: {e}")
+        return None
+
+
+def get_portfolio_strategy(
+    holdings: list[dict],
+    prices: dict[str, float | None],
+    analysis_results: list[tuple[str, AnalysisResult]],
+) -> str | None:
+    if not ANTHROPIC_API_KEY:
+        return None
+
+    context_parts = [_build_portfolio_context(holdings, prices)]
+
+    if analysis_results:
+        context_parts.append("\nTechnical Analysis Summary:")
+        for ticker, result in analysis_results:
+            signals_str = ", ".join(
+                f"[{s.action.value}] {s.name}" for s in result.signals
+            )
+            context_parts.append(
+                f"  {ticker}: ${result.current_price:.2f} | "
+                f"RSI={result.rsi_14:.1f if result.rsi_14 else 'N/A'} | "
+                f"Overall: {result.overall_action.value} | {signals_str}"
+            )
+            if result.price_levels:
+                pl = result.price_levels
+                parts = []
+                if pl.support:
+                    parts.append(f"Support ${pl.support:.2f}")
+                if pl.resistance:
+                    parts.append(f"Resistance ${pl.resistance:.2f}")
+                if pl.stop_loss:
+                    parts.append(f"StopLoss ${pl.stop_loss:.2f}")
+                if pl.target:
+                    parts.append(f"Target ${pl.target:.2f}")
+                if parts:
+                    context_parts.append(f"    Levels: {', '.join(parts)}")
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            system=STRATEGY_PROMPT,
+            messages=[{"role": "user", "content": "\n".join(context_parts)}],
+        )
+        return message.content[0].text
+    except Exception as e:
+        logger.warning(f"AI strategy error: {e}")
         return None
