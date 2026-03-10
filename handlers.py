@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from db import add_stock, remove_stock, get_portfolio, set_alert
-from stock_data import validate_ticker, get_batch_prices, get_current_price
+from stock_data import validate_ticker, get_batch_prices
 from analysis import analyze_stock, Action, Strength
 from ai_advisor import get_ai_advice
 from formatting import format_portfolio, format_analysis, format_alerts
@@ -42,7 +42,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args or len(context.args) < 3:
-        await update.message.reply_text("Usage: /add TICKER QUANTITY PRICE [YYYY-MM-DD]")
+        await update.message.reply_text(
+            "Usage: /add TICKER QUANTITY PRICE [YYYY-MM-DD]"
+        )
         return
 
     ticker = context.args[0].upper()
@@ -82,14 +84,18 @@ async def remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def batch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
-        await update.message.reply_text("Usage: /batch AAPL 10 150, GOOGL 5 140, TSLA 20 200")
+        await update.message.reply_text(
+            "Usage: /batch AAPL 10 150, GOOGL 5 140, TSLA 20 200"
+        )
         return
 
     raw = " ".join(context.args)
     entries = [e.strip() for e in raw.split(",") if e.strip()]
 
     if not entries:
-        await update.message.reply_text("No entries found. Use comma-separated: TICKER QTY PRICE")
+        await update.message.reply_text(
+            "No entries found. Use comma-separated: TICKER QTY PRICE"
+        )
         return
 
     msg = await update.message.reply_text(f"Processing {len(entries)} entries...")
@@ -135,7 +141,9 @@ async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     holdings = get_portfolio(user_id)
 
     if not holdings:
-        await update.message.reply_text("Your portfolio is empty. Use /add to add stocks.")
+        await update.message.reply_text(
+            "Your portfolio is empty. Use /add to add stocks."
+        )
         return
 
     msg = await update.message.reply_text("Fetching live prices...")
@@ -165,7 +173,9 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     result = analyze_stock(ticker, purchase_price)
     if result is None:
-        await msg.edit_text(f"Could not analyze {ticker}. Ensure it's a valid ticker with sufficient history.")
+        await msg.edit_text(
+            f"Could not analyze {ticker}. Ensure it's a valid ticker with sufficient history."
+        )
         return
 
     await msg.edit_text(f"Running AI analysis for {ticker}...")
@@ -180,7 +190,9 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     holdings = get_portfolio(user_id)
 
     if not holdings:
-        await update.message.reply_text("Your portfolio is empty. Use /add to add stocks.")
+        await update.message.reply_text(
+            "Your portfolio is empty. Use /add to add stocks."
+        )
         return
 
     msg = await update.message.reply_text("Scanning holdings for signals...")
@@ -189,7 +201,11 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     for h in holdings:
         result = analyze_stock(h["ticker"], h["purchase_price"])
         if result is not None:
-            important = [s for s in result.signals if s.strength == Strength.STRONG or s.action == Action.SELL]
+            important = [
+                s
+                for s in result.signals
+                if s.strength == Strength.STRONG or s.action == Action.SELL
+            ]
             if important:
                 ticker_results.append((h["ticker"], result))
 

@@ -7,7 +7,14 @@ def test_format_empty_portfolio():
 
 
 def test_format_portfolio_with_holdings():
-    holdings = [{"ticker": "AAPL", "quantity": 10, "purchase_price": 150.0, "purchase_date": "2024-01-15"}]
+    holdings = [
+        {
+            "ticker": "AAPL",
+            "quantity": 10,
+            "purchase_price": 150.0,
+            "purchase_date": "2024-01-15",
+        }
+    ]
     prices = {"AAPL": 175.0}
     result = format_portfolio(holdings, prices)
     assert "AAPL" in result
@@ -16,7 +23,14 @@ def test_format_portfolio_with_holdings():
 
 
 def test_format_portfolio_missing_price():
-    holdings = [{"ticker": "AAPL", "quantity": 10, "purchase_price": 150.0, "purchase_date": "2024-01-15"}]
+    holdings = [
+        {
+            "ticker": "AAPL",
+            "quantity": 10,
+            "purchase_price": 150.0,
+            "purchase_date": "2024-01-15",
+        }
+    ]
     prices = {"AAPL": None}
     result = format_portfolio(holdings, prices)
     assert "N/A" in result

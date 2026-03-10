@@ -43,7 +43,11 @@ class AnalysisResult:
             return Action.HOLD
         sell_count = sum(1 for s in self.signals if s.action == Action.SELL)
         buy_count = sum(1 for s in self.signals if s.action == Action.BUY)
-        strong_sells = sum(1 for s in self.signals if s.action == Action.SELL and s.strength == Strength.STRONG)
+        strong_sells = sum(
+            1
+            for s in self.signals
+            if s.action == Action.SELL and s.strength == Strength.STRONG
+        )
         if strong_sells > 0:
             return Action.SELL
         if sell_count > buy_count:
@@ -84,37 +88,87 @@ def generate_signals(
     # SMA crossover
     if all(v is not None for v in [sma_20, sma_50, prev_sma_20, prev_sma_50]):
         if prev_sma_20 <= prev_sma_50 and sma_20 > sma_50:
-            signals.append(Signal("SMA Crossover", Action.BUY, Strength.STRONG, "Golden cross: SMA-20 crossed above SMA-50"))
+            signals.append(
+                Signal(
+                    "SMA Crossover",
+                    Action.BUY,
+                    Strength.STRONG,
+                    "Golden cross: SMA-20 crossed above SMA-50",
+                )
+            )
         elif prev_sma_20 >= prev_sma_50 and sma_20 < sma_50:
-            signals.append(Signal("SMA Crossover", Action.SELL, Strength.STRONG, "Death cross: SMA-20 crossed below SMA-50"))
+            signals.append(
+                Signal(
+                    "SMA Crossover",
+                    Action.SELL,
+                    Strength.STRONG,
+                    "Death cross: SMA-20 crossed below SMA-50",
+                )
+            )
         elif sma_20 > sma_50:
-            signals.append(Signal("SMA Trend", Action.BUY, Strength.WEAK, f"SMA-20 ({sma_20:.2f}) above SMA-50 ({sma_50:.2f})"))
+            signals.append(
+                Signal(
+                    "SMA Trend",
+                    Action.BUY,
+                    Strength.WEAK,
+                    f"SMA-20 ({sma_20:.2f}) above SMA-50 ({sma_50:.2f})",
+                )
+            )
         else:
-            signals.append(Signal("SMA Trend", Action.SELL, Strength.WEAK, f"SMA-20 ({sma_20:.2f}) below SMA-50 ({sma_50:.2f})"))
+            signals.append(
+                Signal(
+                    "SMA Trend",
+                    Action.SELL,
+                    Strength.WEAK,
+                    f"SMA-20 ({sma_20:.2f}) below SMA-50 ({sma_50:.2f})",
+                )
+            )
 
     # RSI
     if rsi is not None:
         if rsi > 70:
             strength = Strength.STRONG if rsi > 80 else Strength.MODERATE
-            signals.append(Signal("RSI", Action.SELL, strength, f"RSI at {rsi:.1f} (overbought)"))
+            signals.append(
+                Signal("RSI", Action.SELL, strength, f"RSI at {rsi:.1f} (overbought)")
+            )
         elif rsi < 30:
             strength = Strength.STRONG if rsi < 20 else Strength.MODERATE
-            signals.append(Signal("RSI", Action.BUY, strength, f"RSI at {rsi:.1f} (oversold)"))
+            signals.append(
+                Signal("RSI", Action.BUY, strength, f"RSI at {rsi:.1f} (oversold)")
+            )
         else:
-            signals.append(Signal("RSI", Action.HOLD, Strength.WEAK, f"RSI at {rsi:.1f} (neutral)"))
+            signals.append(
+                Signal("RSI", Action.HOLD, Strength.WEAK, f"RSI at {rsi:.1f} (neutral)")
+            )
 
     # Stop-loss / Take-profit
     if purchase_price is not None and purchase_price > 0:
         pct_change = ((current_price - purchase_price) / purchase_price) * 100
         if pct_change <= -STOP_LOSS_PCT:
-            signals.append(Signal("Stop-Loss", Action.SELL, Strength.STRONG, f"Price dropped {pct_change:.1f}% from purchase"))
+            signals.append(
+                Signal(
+                    "Stop-Loss",
+                    Action.SELL,
+                    Strength.STRONG,
+                    f"Price dropped {pct_change:.1f}% from purchase",
+                )
+            )
         elif pct_change >= TAKE_PROFIT_PCT:
-            signals.append(Signal("Take-Profit", Action.SELL, Strength.MODERATE, f"Price up {pct_change:.1f}% from purchase"))
+            signals.append(
+                Signal(
+                    "Take-Profit",
+                    Action.SELL,
+                    Strength.MODERATE,
+                    f"Price up {pct_change:.1f}% from purchase",
+                )
+            )
 
     return signals
 
 
-def analyze_stock(ticker: str, purchase_price: float | None = None) -> AnalysisResult | None:
+def analyze_stock(
+    ticker: str, purchase_price: float | None = None
+) -> AnalysisResult | None:
     df = get_history(ticker)
     if df is None or len(df) < 50:
         return None

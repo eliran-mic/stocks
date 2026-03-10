@@ -32,7 +32,9 @@ def get_db(user_id: int) -> sqlite3.Connection:
     return conn
 
 
-def add_stock(user_id: int, ticker: str, quantity: float, price: float, date: str | None = None) -> None:
+def add_stock(
+    user_id: int, ticker: str, quantity: float, price: float, date: str | None = None
+) -> None:
     date = date or datetime.now().strftime("%Y-%m-%d")
     conn = get_db(user_id)
     try:
@@ -59,7 +61,9 @@ def remove_stock(user_id: int, ticker: str) -> bool:
 def get_portfolio(user_id: int) -> list[dict]:
     conn = get_db(user_id)
     try:
-        rows = conn.execute("SELECT ticker, quantity, purchase_price, purchase_date FROM portfolio ORDER BY ticker").fetchall()
+        rows = conn.execute(
+            "SELECT ticker, quantity, purchase_price, purchase_date FROM portfolio ORDER BY ticker"
+        ).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
@@ -81,7 +85,9 @@ def set_alert(user_id: int, chat_id: int, is_active: bool = True) -> None:
 def get_alert_chat_ids(user_id: int) -> list[int]:
     conn = get_db(user_id)
     try:
-        rows = conn.execute("SELECT chat_id FROM alert_settings WHERE is_active = 1").fetchall()
+        rows = conn.execute(
+            "SELECT chat_id FROM alert_settings WHERE is_active = 1"
+        ).fetchall()
         return [r["chat_id"] for r in rows]
     finally:
         conn.close()

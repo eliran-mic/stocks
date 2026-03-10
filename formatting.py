@@ -32,7 +32,9 @@ def format_portfolio(holdings: list[dict], prices: dict[str, float | None]) -> s
             )
         else:
             total_value += cost
-            lines.append(f"`{ticker:<6}` {qty:>8.2f} sh | Avg: ${buy_price:>8.2f} | Now: N/A")
+            lines.append(
+                f"`{ticker:<6}` {qty:>8.2f} sh | Avg: ${buy_price:>8.2f} | Now: N/A"
+            )
 
     total_pnl = total_value - total_cost
     total_pnl_pct = (total_pnl / total_cost) * 100 if total_cost > 0 else 0
@@ -69,7 +71,9 @@ def format_analysis(result: AnalysisResult, ai_advice: str | None = None) -> str
     if result.signals:
         lines.append("*Signals:*")
         for s in result.signals:
-            lines.append(f"  {_strength_label(s.strength)} [{_action_label(s.action)}] {s.name}: {s.detail}")
+            lines.append(
+                f"  {_strength_label(s.strength)} [{_action_label(s.action)}] {s.name}: {s.detail}"
+            )
 
     if ai_advice:
         lines.append(f"\n*AI Advisor:*\n{ai_advice}")
@@ -84,11 +88,17 @@ def format_alerts(ticker_results: list[tuple[str, AnalysisResult]]) -> str:
 
     lines = ["*Alert Summary*\n"]
     for ticker, result in ticker_results:
-        important = [s for s in result.signals if s.strength == Strength.STRONG or s.action == Action.SELL]
+        important = [
+            s
+            for s in result.signals
+            if s.strength == Strength.STRONG or s.action == Action.SELL
+        ]
         if important:
             lines.append(f"*{ticker}* (${result.current_price:.2f}):")
             for s in important:
-                lines.append(f"  {_strength_label(s.strength)} [{_action_label(s.action)}] {s.detail}")
+                lines.append(
+                    f"  {_strength_label(s.strength)} [{_action_label(s.action)}] {s.detail}"
+                )
             lines.append("")
 
     if len(lines) == 1:

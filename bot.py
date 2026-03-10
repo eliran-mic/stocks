@@ -2,7 +2,13 @@ import logging
 
 from telegram.ext import Application, CommandHandler
 
-from config import TELEGRAM_BOT_TOKEN, PORT, WEBHOOK_URL, IS_CLOUD_RUN, ALERT_INTERVAL_MINUTES
+from config import (
+    TELEGRAM_BOT_TOKEN,
+    PORT,
+    WEBHOOK_URL,
+    IS_CLOUD_RUN,
+    ALERT_INTERVAL_MINUTES,
+)
 from handlers import (
     start_command,
     help_command,

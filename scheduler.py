@@ -27,7 +27,8 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE) -> None:
                 result = analyze_stock(h["ticker"], h["purchase_price"])
                 if result is not None:
                     important = [
-                        s for s in result.signals
+                        s
+                        for s in result.signals
                         if s.strength == Strength.STRONG or s.action == Action.SELL
                     ]
                     if important:

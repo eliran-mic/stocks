@@ -2,7 +2,7 @@ import logging
 
 import anthropic
 
-from analysis import AnalysisResult, Action
+from analysis import AnalysisResult
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,9 @@ Format for Telegram (use *bold* for emphasis). Keep response under 200 words.
 Always end with: This is not financial advice."""
 
 
-def get_ai_advice(result: AnalysisResult, purchase_price: float | None = None) -> str | None:
+def get_ai_advice(
+    result: AnalysisResult, purchase_price: float | None = None
+) -> str | None:
     if not ANTHROPIC_API_KEY:
         return None
 
@@ -26,7 +28,9 @@ def get_ai_advice(result: AnalysisResult, purchase_price: float | None = None) -
     ]
     if purchase_price is not None:
         pnl_pct = ((result.current_price - purchase_price) / purchase_price) * 100
-        context_parts.append(f"Purchase Price: ${purchase_price:.2f} (P&L: {pnl_pct:+.1f}%)")
+        context_parts.append(
+            f"Purchase Price: ${purchase_price:.2f} (P&L: {pnl_pct:+.1f}%)"
+        )
     if result.sma_20 is not None:
         context_parts.append(f"SMA-20: ${result.sma_20:.2f}")
     if result.sma_50 is not None:
@@ -34,9 +38,11 @@ def get_ai_advice(result: AnalysisResult, purchase_price: float | None = None) -
     if result.rsi_14 is not None:
         context_parts.append(f"RSI-14: {result.rsi_14:.1f}")
 
-    context_parts.append(f"\nTechnical Signals:")
+    context_parts.append("\nTechnical Signals:")
     for s in result.signals:
-        context_parts.append(f"- [{s.action.value}] {s.name}: {s.detail} (Strength: {s.strength.value})")
+        context_parts.append(
+            f"- [{s.action.value}] {s.name}: {s.detail} (Strength: {s.strength.value})"
+        )
 
     context_parts.append(f"\nOverall Technical Signal: {result.overall_action.value}")
 
