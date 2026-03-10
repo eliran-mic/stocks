@@ -29,6 +29,14 @@ class Signal:
 
 
 @dataclass
+class PriceLevels:
+    support: float | None
+    resistance: float | None
+    stop_loss: float | None
+    target: float | None
+
+
+@dataclass
 class AnalysisResult:
     ticker: str
     current_price: float
@@ -36,6 +44,7 @@ class AnalysisResult:
     sma_50: float | None
     rsi_14: float | None
     signals: list[Signal]
+    price_levels: PriceLevels | None = None
 
     @property
     def overall_action(self) -> Action:
@@ -55,6 +64,41 @@ class AnalysisResult:
         if buy_count > sell_count:
             return Action.BUY
         return Action.HOLD
+
+
+def compute_price_levels(
+    df: pd.DataFrame,
+    current_price: float,
+    purchase_price: float | None = None,
+) -> PriceLevels:
+    low_20 = df["Low"].tail(20).min()
+    high_20 = df["High"].tail(20).max()
+    low_50 = df["Low"].tail(50).min()
+
+    # Support: recent 20-day low, or 50-day low if closer
+    support = low_20
+
+    # Resistance: recent 20-day high
+    resistance = high_20 if high_20 > current_price else None
+
+    # Stop-loss: 3% below support or purchase-based
+    if purchase_price is not None:
+        stop_loss = round(purchase_price * (1 - STOP_LOSS_PCT / 100), 2)
+    else:
+        stop_loss = round(min(support, low_50) * 0.97, 2)
+
+    # Target: next resistance or +15% from current
+    if resistance is not None and resistance > current_price * 1.02:
+        target = round(resistance, 2)
+    else:
+        target = round(current_price * 1.15, 2)
+
+    return PriceLevels(
+        support=round(support, 2),
+        resistance=round(resistance, 2) if resistance else None,
+        stop_loss=stop_loss,
+        target=target,
+    )
 
 
 def compute_indicators(df: pd.DataFrame) -> dict:
@@ -176,6 +220,7 @@ def analyze_stock(
     current_price = df["Close"].iloc[-1]
     indicators = compute_indicators(df)
     signals = generate_signals(current_price, indicators, purchase_price)
+    price_levels = compute_price_levels(df, current_price, purchase_price)
 
     return AnalysisResult(
         ticker=ticker.upper(),
@@ -184,4 +229,5 @@ def analyze_stock(
         sma_50=indicators.get("sma_50"),
         rsi_14=indicators.get("rsi_14"),
         signals=signals,
+        price_levels=price_levels,
     )

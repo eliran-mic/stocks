@@ -75,6 +75,18 @@ def format_analysis(result: AnalysisResult, ai_advice: str | None = None) -> str
                 f"  {_strength_label(s.strength)} [{_action_label(s.action)}] {s.name}: {s.detail}"
             )
 
+    if result.price_levels:
+        pl = result.price_levels
+        lines.append("\n*Price Levels:*")
+        if pl.support is not None:
+            lines.append(f"  Support: ${pl.support:.2f}")
+        if pl.resistance is not None:
+            lines.append(f"  Resistance: ${pl.resistance:.2f}")
+        if pl.stop_loss is not None:
+            lines.append(f"  Stop-Loss: ${pl.stop_loss:.2f}")
+        if pl.target is not None:
+            lines.append(f"  Target: ${pl.target:.2f}")
+
     if ai_advice:
         lines.append(f"\n*AI Advisor:*\n{ai_advice}")
 

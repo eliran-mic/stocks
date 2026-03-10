@@ -166,9 +166,11 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
     holdings = get_portfolio(user_id)
     purchase_price = None
+    quantity = None
     for h in holdings:
         if h["ticker"] == ticker:
             purchase_price = h["purchase_price"]
+            quantity = h["quantity"]
             break
 
     result = analyze_stock(ticker, purchase_price)
@@ -179,7 +181,7 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     await msg.edit_text(f"Running AI analysis for {ticker}...")
-    ai_advice = get_ai_advice(result, purchase_price)
+    ai_advice = get_ai_advice(result, purchase_price, quantity)
 
     text = format_analysis(result, ai_advice)
     await msg.edit_text(text, parse_mode="Markdown")
