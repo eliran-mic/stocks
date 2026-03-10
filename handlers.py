@@ -7,7 +7,12 @@ from telegram.ext import ContextTypes
 from db import add_stock, remove_stock, get_portfolio, set_alert
 from stock_data import validate_ticker, get_batch_prices
 from analysis import analyze_stock, Action, Strength
-from ai_advisor import get_ai_advice, get_portfolio_strategy, _build_portfolio_context
+from ai_advisor import (
+    get_ai_advice,
+    get_portfolio_strategy,
+    get_scout_recommendations,
+    _build_portfolio_context,
+)
 from formatting import format_portfolio, format_analysis, format_alerts
 
 logger = logging.getLogger(__name__)
@@ -53,6 +58,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/portfolio - View holdings with live P&L\n"
         "/analyze TICKER - Technical + AI analysis\n"
         "/strategy - Full portfolio strategy review\n"
+        "/scout - Find new stocks to buy\n"
         "/alerts - Check all holdings for signals",
         parse_mode="Markdown",
     )
@@ -245,6 +251,35 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 ticker_results.append((h["ticker"], result))
 
     text = format_alerts(ticker_results)
+    await msg.edit_text(text, parse_mode="Markdown")
+
+
+async def scout_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    holdings = get_portfolio(user_id)
+
+    if not holdings:
+        await update.message.reply_text(
+            "Your portfolio is empty. Use /add to add stocks first — "
+            "I need to see what you own to find what's missing."
+        )
+        return
+
+    await update.message.chat.send_action(ChatAction.TYPING)
+    msg = await update.message.reply_text("Scouting new investment opportunities...")
+
+    tickers = [h["ticker"] for h in holdings]
+    prices = get_batch_prices(tickers)
+
+    await update.message.chat.send_action(ChatAction.TYPING)
+    await msg.edit_text("Running AI scout analysis...")
+    recommendations = get_scout_recommendations(holdings, prices)
+
+    if recommendations:
+        text = f"*New Investment Opportunities*\n\n{recommendations}"
+    else:
+        text = "Could not generate recommendations. Check API key configuration."
+
     await msg.edit_text(text, parse_mode="Markdown")
 
 

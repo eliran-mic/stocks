@@ -34,14 +34,38 @@ Your response MUST include:
 2. *Concentration Risk*: flag any position >25% of portfolio, or sector over-exposure
 3. *Weak Positions*: which holdings to trim or exit, with specific prices
 4. *Strong Positions*: which to hold or add to, with target add prices
-5. *Missing Exposure*: sectors/themes the portfolio lacks (e.g. international, bonds, REITs, commodities) — suggest 1-2 specific ETFs/tickers to add
-6. *Action Plan*: numbered list of 3-5 specific trades to execute this week, with order types and prices
-7. *Cash Strategy*: if any sells, where to park or deploy the capital
+5. *New Buys*: 2-3 specific stocks or ETFs NOT in the portfolio that the client should buy now. For each: ticker, why it fits, entry price, and how much of the portfolio to allocate (%). Consider what the portfolio is missing — sectors, geography, asset classes.
+6. *Action Plan*: numbered list of 3-5 specific trades to execute this week, including BOTH sells from current holdings AND new buys, with order types and prices
+7. *Cash Strategy*: if any sells, how to redeploy — be specific about split between new positions vs cash reserve
 
-Think like a wealth manager: diversification, risk-adjusted returns, downside protection.
+Think like a wealth manager: diversification, risk-adjusted returns, downside protection. Always be looking for the NEXT opportunity, not just managing what we already own.
 
-Format for Telegram (use *bold* for key numbers and tickers). Keep under 400 words.
+Format for Telegram (use *bold* for key numbers and tickers). Keep under 500 words.
 Use $ for prices. Be direct and specific — no vague platitudes.
+End with: _Not financial advice. Do your own research._"""
+
+SCOUT_PROMPT = """You are a family office CIO looking for NEW investment opportunities for a client. You are given their current portfolio — your job is to find stocks they SHOULD buy but DON'T own yet.
+
+Your response MUST include exactly 5 stock picks:
+
+For each pick:
+- *Ticker* and company name
+- *Why*: 1 sentence on thesis (growth, value, dividend, defensive, etc.)
+- *Entry*: specific buy price or "at market"
+- *Target*: 12-month price target
+- *Stop-loss*: price to cut losses
+- *Allocation*: what % of portfolio to put in
+
+Selection criteria:
+- Fill gaps in the current portfolio (missing sectors, geographies, asset classes)
+- Mix of growth and defensive names
+- At least one ETF for diversification
+- At least one dividend payer for income
+- Consider current market conditions and valuations
+- Avoid sectors the portfolio is already heavy in
+
+Format for Telegram (use *bold* for tickers and prices). Keep under 400 words.
+Be specific — exact tickers, exact prices, exact percentages.
 End with: _Not financial advice. Do your own research._"""
 
 
@@ -192,4 +216,31 @@ def get_portfolio_strategy(
         return message.content[0].text
     except Exception as e:
         logger.warning(f"AI strategy error: {e}")
+        return None
+
+
+def get_scout_recommendations(
+    holdings: list[dict],
+    prices: dict[str, float | None],
+) -> str | None:
+    if not ANTHROPIC_API_KEY:
+        return None
+
+    context_parts = [_build_portfolio_context(holdings, prices)]
+    context_parts.append(
+        "\nFind 5 NEW stocks/ETFs this portfolio should buy. "
+        "Fill sector gaps, balance risk, and maximize long-term growth."
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=1024,
+            system=SCOUT_PROMPT,
+            messages=[{"role": "user", "content": "\n".join(context_parts)}],
+        )
+        return message.content[0].text
+    except Exception as e:
+        logger.warning(f"AI scout error: {e}")
         return None

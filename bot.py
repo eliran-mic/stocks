@@ -19,6 +19,7 @@ from handlers import (
     portfolio_command,
     analyze_command,
     strategy_command,
+    scout_command,
     alerts_command,
 )
 from scheduler import check_alerts
@@ -45,6 +46,7 @@ def main() -> None:
     app.add_handler(CommandHandler("portfolio", portfolio_command))
     app.add_handler(CommandHandler("analyze", analyze_command))
     app.add_handler(CommandHandler("strategy", strategy_command))
+    app.add_handler(CommandHandler("scout", scout_command))
     app.add_handler(CommandHandler("alerts", alerts_command))
 
     app.add_error_handler(error_handler)
