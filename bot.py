@@ -10,6 +10,7 @@ from config import (
     ALERT_INTERVAL_MINUTES,
 )
 from handlers import (
+    error_handler,
     start_command,
     help_command,
     add_command,
@@ -45,6 +46,8 @@ def main() -> None:
     app.add_handler(CommandHandler("analyze", analyze_command))
     app.add_handler(CommandHandler("strategy", strategy_command))
     app.add_handler(CommandHandler("alerts", alerts_command))
+
+    app.add_error_handler(error_handler)
 
     # Schedule periodic alert checks
     app.job_queue.run_repeating(

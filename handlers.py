@@ -1,6 +1,7 @@
 import logging
 
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from db import add_stock, remove_stock, get_portfolio, set_alert
@@ -10,6 +11,19 @@ from ai_advisor import get_ai_advice, get_portfolio_strategy, _build_portfolio_c
 from formatting import format_portfolio, format_analysis, format_alerts
 
 logger = logging.getLogger(__name__)
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Exception while handling update:", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_chat:
+        short = str(context.error)[:200]
+        try:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"Something went wrong: {short}",
+            )
+        except Exception:
+            pass
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -61,6 +75,7 @@ async def add_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     date = context.args[3] if len(context.args) > 3 else None
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text(f"Validating {ticker}...")
 
     if not validate_ticker(ticker):
@@ -102,6 +117,7 @@ async def batch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text(f"Processing {len(entries)} entries...")
 
     user_id = update.effective_user.id
@@ -122,6 +138,7 @@ async def batch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             failures.append(f"{ticker} - quantity/price must be numbers")
             continue
 
+        await update.message.chat.send_action(ChatAction.TYPING)
         if not validate_ticker(ticker):
             failures.append(f"{ticker} - ticker not found")
             continue
@@ -150,6 +167,7 @@ async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text("Fetching live prices...")
 
     tickers = [h["ticker"] for h in holdings]
@@ -164,6 +182,7 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     ticker = context.args[0].upper()
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text(f"Analyzing {ticker}...")
 
     # Check if user holds this stock
@@ -185,6 +204,7 @@ async def analyze_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     # Build full portfolio context so AI sees the bigger picture
+    await update.message.chat.send_action(ChatAction.TYPING)
     await msg.edit_text(f"Running AI analysis for {ticker}...")
     portfolio_context = None
     if holdings:
@@ -208,10 +228,12 @@ async def alerts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text("Scanning holdings for signals...")
 
     ticker_results = []
     for h in holdings:
+        await update.message.chat.send_action(ChatAction.TYPING)
         result = analyze_stock(h["ticker"], h["purchase_price"])
         if result is not None:
             important = [
@@ -236,6 +258,7 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     msg = await update.message.reply_text(
         "Analyzing full portfolio — running strategy review..."
     )
@@ -246,10 +269,12 @@ async def strategy_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     analysis_results = []
     for h in holdings:
+        await update.message.chat.send_action(ChatAction.TYPING)
         result = analyze_stock(h["ticker"], h["purchase_price"])
         if result is not None:
             analysis_results.append((h["ticker"], result))
 
+    await update.message.chat.send_action(ChatAction.TYPING)
     await msg.edit_text("Running AI strategy review...")
     strategy = get_portfolio_strategy(holdings, prices, analysis_results)
 
