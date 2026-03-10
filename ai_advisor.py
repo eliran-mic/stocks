@@ -164,7 +164,7 @@ def get_portfolio_strategy(
             )
             context_parts.append(
                 f"  {ticker}: ${result.current_price:.2f} | "
-                f"RSI={result.rsi_14:.1f if result.rsi_14 else 'N/A'} | "
+                f"RSI={f'{result.rsi_14:.1f}' if result.rsi_14 else 'N/A'} | "
                 f"Overall: {result.overall_action.value} | {signals_str}"
             )
             if result.price_levels:
